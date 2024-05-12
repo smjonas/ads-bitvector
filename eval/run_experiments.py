@@ -21,4 +21,11 @@ run.add(
     header_command="python3 benchmark.py --header",
     stdout_file="./output/benchmark_results.csv",
 )
+
+run.add(
+    "plot",
+    "python3 plot_query_type_vs_time.py ./output/benchmark_results.csv ./output/query_type_vs_time.png",
+    {},
+)
+
 run.run()

@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 
@@ -19,16 +20,25 @@ def benchmark_rust_program(input_file, output_file):
     return parse_result(result.stdout)
 
 
+def extract_k(filename):
+    match = re.search(r"queries(\d+)\.txt", filename)
+    if match:
+        return int(match.group(1))
+    else:
+        return None
+
+
 def main(input_file) -> str:
     query_type = input_file.split("_")[1]
+    k = extract_k(input_file)
     output_file = "temp_output.txt"
     time, space = benchmark_rust_program(input_file, output_file)
     file_name = os.path.basename(input_file)
-    return f"{query_type},{file_name},{time},{space}"
+    return f"{query_type},{file_name},{k},{time},{space}"
 
 
 def print_header():
-    print("query_type,input_file,time,space")
+    print("query_type,input_file,k,time,space")
 
 
 if __name__ == "__main__":
