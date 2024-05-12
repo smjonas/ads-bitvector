@@ -1,9 +1,24 @@
 import run
 
+n = 1_000_000
+step_size = 25_000
+
 run.add(
     "gen_dataset",
-    "python3 generate_dataset.py 1_000_000 25_000 [[query_type]] ./input [[seed]]",
+    f"python3 generate_dataset.py {n} {step_size} [[query_type]] ./input [[seed]]",
     {"query_type": ["access", "rank", "select", "mixed"], "seed": ["42", "43", "44", "45"]},
-    creates_file="./input/bitvector_[[query_type]]_n1000000_seed[[seed]]_queries25000.txt",
+    creates_file=f"./input/bitvector_[[query_type]]_n{n}_seed[[seed]]_queries{step_size}.txt",
+)
+
+run.add(
+    "benchmark",
+    f"python3 benchmark.py ./input/bitvector_[[query_type]]_n{n}_seed[[seed]]_queries[[k]].txt",
+    {
+        "query_type": ["access", "rank", "select", "mixed"],
+        "seed": ["42", "43", "44", "45"],
+        "k": list(range(step_size, n + 1, step_size)),
+    },
+    header_command="python3 benchmark.py --header",
+    stdout_file="./output/benchmark_results.csv",
 )
 run.run()
