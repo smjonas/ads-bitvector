@@ -1,6 +1,9 @@
 use std::fs;
+use std::mem::{size_of, size_of_val};
+use std::time::Instant;
 
 fn main() {
+    let now = Instant::now();
     let args: Vec<String> = std::env::args().collect();
     let input_file_path = &args[1];
     let output_file_path = &args[2];
@@ -23,7 +26,10 @@ fn main() {
         })
         .map(|query_string| parse_and_run_query(&bit_vector, query_string))
         .collect();
+    let elapsed = now.elapsed();
     export_results(results, output_file_path);
+    let size = size_of_val(&bit_vector);
+    println!("RESULT algo=bv name=jonas_strittmatter time={:?} space={}", elapsed.as_millis(), size);
 }
 
 fn parse_and_run_query(bit_vector: &Vec<u8>, query_string: &str) -> u32 {
@@ -80,7 +86,6 @@ fn string_to_bit_vector(bit_string: &str) -> Vec<u8> {
     let mut current_byte: u8 = 0;
     let mut bit_count = 0;
 
-    println!("{}", bit_string.len());
     for character in bit_string.chars() {
         current_byte <<= 1;
         if character == '1' {
