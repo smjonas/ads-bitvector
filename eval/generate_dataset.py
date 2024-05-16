@@ -43,12 +43,11 @@ def write_output_file(output_folder, filename, bitvector, queries):
         f.write("\n".join(queries))
 
 
-def generate_dataset(n, step_size, query_type, output_folder, seed):
+def generate_dataset(n, max_k, step_size, query_type, output_folder, seed):
     bitvector = generate_bitvector(n, seed)
     indices = index_bitvector(bitvector)
-    max_queries = 1_000_000
 
-    for k in range(step_size, max_queries + 1, step_size):
+    for k in range(step_size, max_k + 1, step_size):
         queries = []
         while len(queries) < k:
             query = generate_query(indices, query_type, n)
@@ -62,12 +61,13 @@ if __name__ == "__main__":
     import sys
 
     args = sys.argv[1:]
-    if len(args) < 4:
-        print("Usage: python script.py <n> <step_size> <query_type> <output_folder> <seed>")
+    if len(args) != 6:
+        print("Usage: python script.py <n> <max_k> <step_size> <query_type> <output_folder> <seed>")
     else:
         n = int(args[0])
-        step_size = int(args[1])
-        query_type = args[2]
-        output_folder = args[3]
-        seed = int(args[4])
-        generate_dataset(n, step_size, query_type, output_folder, seed)
+        max_k = int(args[1])
+        step_size = int(args[2])
+        query_type = args[3]
+        output_folder = args[4]
+        seed = int(args[5])
+        generate_dataset(n, max_k, step_size, query_type, output_folder, seed)

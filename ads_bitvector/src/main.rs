@@ -1,5 +1,5 @@
 use std::fs;
-use std::mem::{size_of, size_of_val};
+use std::mem::size_of;
 use std::time::Instant;
 
 fn main() {
@@ -9,7 +9,7 @@ fn main() {
     let output_file_path = &args[2];
     let contents = std::fs::read_to_string(input_file_path).expect("Failed to read input file");
     let mut split_contents = contents.split("\n");
-    let n = split_contents
+    let query_count = split_contents
         .next()
         .expect("Missing number of queries in input file")
         .parse()
@@ -18,7 +18,7 @@ fn main() {
         .next()
         .expect("Missing bit string in second line");
     let bit_vector = string_to_bit_vector(bits);
-    let results: Vec<u32> = (0..n)
+    let results: Vec<u32> = (0..query_count)
         .map(|_| {
             split_contents
                 .next()
@@ -28,8 +28,12 @@ fn main() {
         .collect();
     let elapsed = now.elapsed();
     export_results(results, output_file_path);
-    let size = size_of_val(&bit_vector);
-    println!("RESULT algo=bv name=jonas_strittmatter time={:?} space={}", elapsed.as_millis(), size);
+    let size = ((bit_vector.len() + 7) / 8) * size_of::<u32>();
+    println!(
+        "RESULT algo=bv name=jonas_strittmatter time={:?} space={}",
+        elapsed.as_millis(),
+        size
+    );
 }
 
 fn parse_and_run_query(bit_vector: &Vec<u8>, query_string: &str) -> u32 {
