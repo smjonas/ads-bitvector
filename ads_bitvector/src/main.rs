@@ -85,18 +85,8 @@ fn select(bit_vector: &Vec<u8>, b: u32, i: u32) -> u32 {
         }
         pos += 1
     }
-    // Adjust positon
+    // Adjust position
     pos - 1
-}
-
-// Writes the results to the output file (one line per query).
-fn export_results(results: Vec<u32>, output_file_path: &str) {
-    let results_string = results
-        .iter()
-        .map(|result| result.to_string())
-        .collect::<Vec<_>>()
-        .join("\n");
-    fs::write(output_file_path, results_string).expect("Unable to write results to output file");
 }
 
 // Converts a bit string to a vector of bytes.
@@ -131,3 +121,14 @@ fn string_to_bit_vector(bit_string: &str) -> Vec<u8> {
     }
     bit_vector
 }
+
+// Writes the results to the output file (one line per query).
+fn export_results(results: Vec<u32>, output_file_path: &str) {
+    let results_string = results
+        .iter()
+        .map(|result| result.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(output_file_path, results_string).expect("Unable to write results to output file");
+}
+
