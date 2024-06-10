@@ -3,11 +3,13 @@ use std::mem::size_of;
 use std::time::Instant;
 
 fn main() {
-    let now = Instant::now();
+    // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
     let input_file_path = &args[1];
     let output_file_path = &args[2];
     let contents = std::fs::read_to_string(input_file_path).expect("Failed to read input file");
+    // Start measurement after file has been read
+    let now = Instant::now();
     let mut split_contents = contents.split("\n");
     let query_count = split_contents
         .next()
@@ -18,6 +20,7 @@ fn main() {
         .next()
         .expect("Missing bit string in second line");
     let bit_vector = string_to_bit_vector(bits);
+    // Process each query and collect the results
     let results: Vec<u32> = (0..query_count)
         .map(|_| {
             split_contents
@@ -28,6 +31,7 @@ fn main() {
         .collect();
     let elapsed = now.elapsed();
     export_results(results, output_file_path);
+    // Calculate space used by the bit vector (round up to next byte size)
     let size = ((bit_vector.len() + 7) / 8) * size_of::<u32>();
     println!(
         "RESULT algo=bv name=jonas_strittmatter time={:?} space={}",
@@ -36,6 +40,7 @@ fn main() {
     );
 }
 
+// Parses the query and executes the appropriate function depending on the query type.
 fn parse_and_run_query(bit_vector: &Vec<u8>, query_string: &str) -> u32 {
     let query_components: Vec<&str> = query_string.split(" ").collect();
     let query_type = query_components[0];
@@ -49,20 +54,28 @@ fn parse_and_run_query(bit_vector: &Vec<u8>, query_string: &str) -> u32 {
     result
 }
 
+// Returns the i-th bit in the bit vector.
 fn access(bit_vector: &Vec<u8>, i: u32) -> u32 {
+    // Determine the byte in which the i-th bit is located
     let block = bit_vector[(i / 8) as usize];
+    // Determine the bit's offset within the byte
     let offset = 7 - (i % 8);
-    let byte = (block >> offset) & 1;
-    byte as u32
+    let bit = (block >> offset) & 1;
+    bit as u32
 }
 
+// Counts the number of occurrences of bit b (0 or 1) up to the i-th position.
 fn rank(bit_vector: &Vec<u8>, b: u32, i: u32) -> u32 {
     (0..i)
+        // Map each position to its corresponding bit value...
         .map(|j| access(&bit_vector, j))
+        // ...and only keep those that match b.
         .filter(|&val| val == b)
         .count() as u32
 }
 
+// Finds the position of the i-th occurrence of bit b.
+// Returns -1 if there is no such bit.
 fn select(bit_vector: &Vec<u8>, b: u32, i: u32) -> u32 {
     let mut count = 0;
     let mut pos = 0;
@@ -72,9 +85,11 @@ fn select(bit_vector: &Vec<u8>, b: u32, i: u32) -> u32 {
         }
         pos += 1
     }
+    // Adjust positon
     pos - 1
 }
 
+// Writes the results to the output file (one line per query).
 fn export_results(results: Vec<u32>, output_file_path: &str) {
     let results_string = results
         .iter()
@@ -84,6 +99,7 @@ fn export_results(results: Vec<u32>, output_file_path: &str) {
     fs::write(output_file_path, results_string).expect("Unable to write results to output file");
 }
 
+// Converts a bit string to a vector of bytes.
 fn string_to_bit_vector(bit_string: &str) -> Vec<u8> {
     let total_bytes = (bit_string.len() + 7) / 8;
     let mut bit_vector: Vec<u8> = Vec::with_capacity(total_bytes);
@@ -91,13 +107,16 @@ fn string_to_bit_vector(bit_string: &str) -> Vec<u8> {
     let mut bit_count = 0;
 
     for character in bit_string.chars() {
+        // Left-shift current byte to make space for the new bit
         current_byte <<= 1;
+        // Set the LSB of the current byte
         if character == '1' {
             current_byte |= 1;
         } else {
             current_byte |= 0;
         }
         bit_count += 1;
+        // If 8 bits have been processed, push the current byte to the bit vector and reset
         if bit_count == 8 {
             bit_vector.push(current_byte);
             current_byte = 0;
@@ -105,6 +124,7 @@ fn string_to_bit_vector(bit_string: &str) -> Vec<u8> {
         }
     }
 
+    // Add the remaining bits if the bit count is not a multiple of 8
     if bit_count != 0 {
         current_byte <<= 8 - bit_count;
         bit_vector.push(current_byte);
