@@ -17,10 +17,9 @@ def plot_results(results_csv, output_path):
 
     plt.xlabel("Number of queries")
     plt.ylabel("Time (ms)")
-    plt.title("Runtime by query type (n = 1.000.000)")
     plt.legend()
-    plt.show()
     plt.savefig(output_path)
+    plt.show()
 
 
 if __name__ == "__main__":
