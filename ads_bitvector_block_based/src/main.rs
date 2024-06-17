@@ -1,3 +1,4 @@
+use std::fs;
 use std::mem::size_of;
 use std::time::Instant;
 
@@ -36,7 +37,7 @@ fn main() {
                 .next()
                 .expect("Too few queries in input file")
         })
-        .map(|query_string| parse_and_run_query(&bit_vector, query_string))
+        .map(|query_string| parse_and_run_query(&bit_vector, &aux_tables, query_string))
         .collect();
     let elapsed = now.elapsed();
     export_results(results, output_file_path);
@@ -52,14 +53,14 @@ fn main() {
     println!(
         "RESULT algo=bv name=jonas_strittmatter time={:?} space={}",
         elapsed.as_millis(),
-        size
+        total_size
     );
 }
 
 // Parses the query and executes the appropriate function depending on the query type.
 fn parse_and_run_query(
     bit_vector: &Vec<u8>,
-    aux_tables: AuxiliaryTables,
+    aux_tables: &AuxiliaryTables,
     query_string: &str,
 ) -> u32 {
     let query_components: Vec<&str> = query_string.split(" ").collect();
@@ -115,9 +116,8 @@ fn rank(bit_vector: &Vec<u8>, rank_table: &Vec<usize>, b: u32, i: u32) -> u32 {
 // Finds the position of the i-th occurrence of bit b.
 // Uses a precomputed select table for faster access.
 // Returns u32::MAX if there is no such bit.
-fn select(bit_vector: &Vec<u8>, b: u32, i: u32) -> u32 {
+fn select(bit_vector: &Vec<u8>, select_table: &Vec<usize>, b: u32, i: u32) -> u32 {
     let mut count = 0;
-    let mut pos = 0;
     for &pos in select_table.iter() {
         if access(bit_vector, pos as u32) == b {
             count += 1;

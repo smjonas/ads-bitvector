@@ -1,16 +1,17 @@
 import sys
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
+
+colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]  # Blue, Orange, Green, Red
 
 
 def plot_results(results_csv, output_path):
     df = pd.read_csv(results_csv)
     plt.figure(figsize=(10, 6))
     query_types = df["query_type"].unique()
-    colors = plt.cm.viridis(np.linspace(0, 1, len(query_types)))
 
+    assert len(query_types) == len(colors)
     for query_type, color in zip(query_types, colors):
         subset = df[df["query_type"] == query_type]
         plt.plot(subset["k"], subset["time"], label=query_type, color=color)
