@@ -98,7 +98,8 @@ fn rank(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> u32 {
 // Returns None if there is no such bit.
 fn select(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> Option<u32> {
     // The block to search in; if the rank at a block boundary is higher than i, then we know it we went too far
-    let block = find_predecessor(rank_table, i).unwrap();
+    println!("{:?}", rank_table);
+    let block = find_predecessor(rank_table, i).expect("invalid argument 'i' in select query");
     // The initial count is given by the rank at the start of the block
     let mut count = rank_table[block as usize];
     for offset in 0..BLOCK_SIZE as u32 {
@@ -115,6 +116,7 @@ fn select(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> Option
 }
 
 // Returns the largest value <= x, or None if not found.
+// Requires O(n) time for simplicity, which could be improved.
 fn find_predecessor(values: &Vec<u32>, x: u32) -> Option<u32> {
     let mut predecessor = None;
     for &value in values {
@@ -146,6 +148,8 @@ fn build_rank_tables(bit_vector: &Vec<u8>) -> (Vec<u32>, Vec<u32>) {
             }
         }
         if (i * 8) % BLOCK_SIZE == 0 {
+            println!("rank0 {} {}", rank0, i);
+            println!("rank1 {}", rank1);
             rank0_table[(i * 8) / BLOCK_SIZE] = rank0;
             rank1_table[(i * 8) / BLOCK_SIZE] = rank1;
         }
