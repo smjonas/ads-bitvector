@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::fs;
 use std::mem::size_of;
 use std::time::Instant;
@@ -30,7 +31,9 @@ fn main() {
                 .next()
                 .expect("Too few queries in input file")
         })
-        .map(|query_string| parse_and_run_query(&bit_vector, &rank0_table, &rank1_table, query_string))
+        .map(|query_string| {
+            parse_and_run_query(&bit_vector, &rank0_table, &rank1_table, query_string)
+        })
         .collect();
     let elapsed = now.elapsed();
     export_results(results, output_file_path);
@@ -47,19 +50,22 @@ fn main() {
 }
 
 // Parses the query and executes the appropriate function depending on the query type.
-fn parse_and_run_query(bit_vector: &Vec<u8>, rank0_table: &Vec<u32>, rank1_table: &Vec<u32>, query_string: &str) -> u32 {
+fn parse_and_run_query(
+    bit_vector: &Vec<u8>,
+    rank0_table: &Vec<u32>,
+    rank1_table: &Vec<u32>,
+    query_string: &str,
+) -> u32 {
+    println!("query: {}", query_string);
     let query_components: Vec<&str> = query_string.split(" ").collect();
     let query_type = query_components[0];
     let i = query_components[1].parse().unwrap();
     if query_type == "access" {
         return access(bit_vector, i);
     }
-    let b = query_components[2].parse().unwrap();
-    let rank_table = if b == 0 {
-        &rank0_table
-    } else {
-        &rank1_table
-    };
+    let b = i;
+    let i = query_components[2].parse().unwrap();
+    let rank_table = if b == 0 { &rank0_table } else { &rank1_table };
     if query_type == "rank" {
         return rank(bit_vector, rank_table, b, i);
     } else if query_type == "select" {
@@ -83,10 +89,11 @@ fn access(bit_vector: &Vec<u8>, i: u32) -> u32 {
 fn rank(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> u32 {
     let block_index = (i as usize) / BLOCK_SIZE;
     let mut rank = rank_table[block_index];
-    let start = (block_index * BLOCK_SIZE) as u32;
+    let start = (block_index * BLOCK_SIZE * 8) as u32;
 
     for j in start..i {
         if access(bit_vector, j) == b {
+            println!("rank: {}", rank);
             rank += 1;
         }
     }
@@ -99,14 +106,18 @@ fn rank(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> u32 {
 fn select(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> Option<u32> {
     // The block to search in; if the rank at a block boundary is higher than i, then we know it we went too far
     println!("{:?}", rank_table);
-    let block = find_predecessor(rank_table, i).expect("invalid argument 'i' in select query");
+    let block = find_predecessor_index(rank_table, i).expect("invalid argument 'i' in select query");
+    println!("block: {}", block);
     // The initial count is given by the rank at the start of the block
     let mut count = rank_table[block as usize];
-    for offset in 0..BLOCK_SIZE as u32 {
-        let pos = block * (BLOCK_SIZE as u32) + offset;
+    for bit_offset in 0..min(BLOCK_SIZE, bit_vector.len() * 8) as u32 {
+        let pos = 8 * (block * BLOCK_SIZE) as u32 + bit_offset;
+        println!("pos: {}, offset: {}, len: {}, b: {}", pos, bit_offset, bit_vector.len() * 8, b);
         if access(bit_vector, pos) == b {
             count += 1;
+            println!("count: {}", count);
             if count == i {
+                println!("found! {}", pos);
                 return Some(pos);
             }
         }
@@ -115,13 +126,13 @@ fn select(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> Option
     None
 }
 
-// Returns the largest value <= x, or None if not found.
+// Returns the index of the largest value <= x, or None if not found.
 // Requires O(n) time for simplicity, which could be improved.
-fn find_predecessor(values: &Vec<u32>, x: u32) -> Option<u32> {
+fn find_predecessor_index(values: &Vec<u32>, x: u32) -> Option<usize> {
     let mut predecessor = None;
-    for &value in values {
+    for (i, &value) in values.iter().enumerate() {
         if value <= x {
-            predecessor = Some(value)
+            predecessor = Some(i)
         } else {
             break;
         }
@@ -134,26 +145,24 @@ fn build_rank_tables(bit_vector: &Vec<u8>) -> (Vec<u32>, Vec<u32>) {
     // Stores all rank_0 / rank_1 values at the beginning of a block
     let mut rank0_table = vec![0; (bit_vector.len() * 8 + BLOCK_SIZE - 1) / BLOCK_SIZE];
     let mut rank1_table = vec![0; (bit_vector.len() * 8 + BLOCK_SIZE - 1) / BLOCK_SIZE];
-    // Stores the positions of all 0s / 1s in the bit vector
+    // Stores the number of all 0s / 1s in the bit vector
     let mut rank0 = 0;
     let mut rank1 = 0;
 
-    for (i, &byte) in bit_vector.iter().enumerate() {
-        for j in 0..8 {
-            let jth_bit_in_byte = byte & (1 << (7 - j));
-            if jth_bit_in_byte == 0 {
+    for block in 1..rank0_table.len() {
+        for i in 0..BLOCK_SIZE * 8 {
+            let bit = access(bit_vector, (block * BLOCK_SIZE * 8 + i) as u32);
+            if bit == 0 {
                 rank0 += 1;
             } else {
                 rank1 += 1;
             }
         }
-        if (i * 8) % BLOCK_SIZE == 0 {
-            println!("rank0 {} {}", rank0, i);
-            println!("rank1 {}", rank1);
-            rank0_table[(i * 8) / BLOCK_SIZE] = rank0;
-            rank1_table[(i * 8) / BLOCK_SIZE] = rank1;
-        }
+        rank0_table[block] = rank0;
+        rank1_table[block] = rank1;
     }
+    println!("rank0 table: {:?}", rank0_table);
+    println!("rank1 table: {:?}", rank1_table);
     (rank0_table, rank1_table)
 }
 
