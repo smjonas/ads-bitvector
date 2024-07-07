@@ -215,41 +215,74 @@ fn export_results(results: Vec<u32>, output_file_path: &str) {
 mod tests {
     use super::*;
 
-     #[test]
-     fn test_select_single_block() {
-         let bit_vector = vec![0b10101010];
-         let rank_table = vec![0];
-         assert_eq!(select(&bit_vector, &rank_table, 1, 1), Some(0));
-         assert_eq!(select(&bit_vector, &rank_table, 1, 2), Some(2));
-         assert_eq!(select(&bit_vector, &rank_table, 1, 3), Some(4));
-         assert_eq!(select(&bit_vector, &rank_table, 1, 4), Some(6));
-         assert_eq!(select(&bit_vector, &rank_table, 0, 1), Some(1));
-         assert_eq!(select(&bit_vector, &rank_table, 0, 2), Some(3));
-     }
+    #[test]
+    fn test_select_single_block() {
+        let bit_vector = vec![0b10101010];
+        let rank_table = vec![0];
+        assert_eq!(select(&bit_vector, &rank_table, 1, 1), Some(0));
+        assert_eq!(select(&bit_vector, &rank_table, 1, 2), Some(2));
+        assert_eq!(select(&bit_vector, &rank_table, 1, 3), Some(4));
+        assert_eq!(select(&bit_vector, &rank_table, 1, 4), Some(6));
+        assert_eq!(select(&bit_vector, &rank_table, 0, 1), Some(1));
+        assert_eq!(select(&bit_vector, &rank_table, 0, 2), Some(3));
+    }
 
-     #[test]
-     fn test_select_multiple_blocks() {
-         let bit_vector = string_to_bit_vector("1010101011001100");
-         let rank_table = vec![0, 4]; // 4 ones before the second block at index 9
-         assert_eq!(select(&bit_vector, &rank_table, 1, 5), Some(8));
-         assert_eq!(select(&bit_vector, &rank_table, 1, 6), Some(9));
-         assert_eq!(select(&bit_vector, &rank_table, 1, 7), Some(12));
-         assert_eq!(select(&bit_vector, &rank_table, 1, 8), Some(13));
-     }
+    #[test]
+    fn test_select_multiple_blocks() {
+        let bit_vector = string_to_bit_vector("1010101011001100");
+        let rank_table = vec![0, 4]; // 4 ones before the second block at index 9
+        assert_eq!(select(&bit_vector, &rank_table, 1, 5), Some(8));
+        assert_eq!(select(&bit_vector, &rank_table, 1, 6), Some(9));
+        assert_eq!(select(&bit_vector, &rank_table, 1, 7), Some(12));
+        assert_eq!(select(&bit_vector, &rank_table, 1, 8), Some(13));
+    }
 
-      #[test]
-      fn test_select_exceeds_occurrences() {
-          let bit_vector = string_to_bit_vector("10101010");
-          let rank_table = vec![0];
-          assert_eq!(select(&bit_vector, &rank_table, 1, 5), None);
-      }
+    #[test]
+    fn test_select_exceeds_occurrences() {
+        let bit_vector = string_to_bit_vector("10101010");
+        let rank_table = vec![0];
+        assert_eq!(select(&bit_vector, &rank_table, 1, 5), None);
+    }
 
-     #[test]
-     fn test_select_edge_cases() {
-         let bit_vector = string_to_bit_vector("1111111100000000");
-         let rank_table = vec![0, 8]; // 8 ones in first block
-         assert_eq!(select(&bit_vector, &rank_table, 1, 1), Some(0));
-         assert_eq!(select(&bit_vector, &rank_table, 1, 8), Some(7));
-         assert_eq!(select(&bit_vector, &rank_table, 1, 9), None);
-     }
+    #[test]
+    fn test_select_edge_cases() {
+        let bit_vector = string_to_bit_vector("1111111100000000");
+        let rank_table = vec![0, 8]; // 8 ones in first block
+        assert_eq!(select(&bit_vector, &rank_table, 1, 1), Some(0));
+        assert_eq!(select(&bit_vector, &rank_table, 1, 8), Some(7));
+        assert_eq!(select(&bit_vector, &rank_table, 1, 9), None);
+    }
+
+    #[test]
+    fn test_build_rank_tables_single_block() {
+        let bit_vector = string_to_bit_vector("10101010");
+        let (rank0_table, rank1_table) = build_rank_tables(&bit_vector);
+        assert_eq!(rank0_table, vec![0]);
+        assert_eq!(rank1_table, vec![0]);
+    }
+
+    #[test]
+    fn test_build_rank_tables_multiple_blocks() {
+        let bit_vector = string_to_bit_vector("1010101011001100");
+        let (rank0_table, rank1_table) = build_rank_tables(&bit_vector);
+        assert_eq!(rank0_table, vec![0, 4]); // 4 zeros in first block
+        assert_eq!(rank1_table, vec![0, 4]); // 4 ones in first block
+    }
+
+    #[test]
+    fn test_build_rank_tables_multiple_blocks_incomplete_block() {
+        // 2 blocks + 1 digit
+        let bit_vector = string_to_bit_vector("10101010110011001");
+        let (rank0_table, rank1_table) = build_rank_tables(&bit_vector);
+        assert_eq!(rank0_table, vec![0, 4, 8]); // 4 zeros in each block
+        assert_eq!(rank1_table, vec![0, 4, 8]); // 4 ones in each block
+    }
+
+    #[test]
+    fn test_build_rank_tables_all_zeros() {
+        let bit_vector = string_to_bit_vector("0000000000000000");
+        let (rank0_table, rank1_table) = build_rank_tables(&bit_vector);
+        assert_eq!(rank0_table, vec![0, 8]); // 8 zeros in first block
+        assert_eq!(rank1_table, vec![0, 0]); // 0 ones in total
+    }
 }
