@@ -3,6 +3,7 @@ use std::fs;
 use std::mem::size_of;
 use std::time::Instant;
 
+// The block size in bits
 const BLOCK_SIZE: usize = 512;
 
 fn main() {
@@ -56,7 +57,6 @@ fn parse_and_run_query(
     rank1_table: &Vec<u32>,
     query_string: &str,
 ) -> u32 {
-    println!("query: {}", query_string);
     let query_components: Vec<&str> = query_string.split(" ").collect();
     let query_type = query_components[0];
     let i = query_components[1].parse().unwrap();
@@ -93,7 +93,6 @@ fn rank(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> u32 {
 
     for j in start..i {
         if access(bit_vector, j) == b {
-            println!("rank: {}", rank);
             rank += 1;
         }
     }
@@ -105,19 +104,19 @@ fn rank(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> u32 {
 // Returns None if there is no such bit.
 fn select(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> Option<u32> {
     // The block to search in; if the rank at a block boundary is higher than i, then we know it we went too far
-    println!("{:?}", rank_table);
-    let block = find_predecessor_index(rank_table, i).expect("invalid argument 'i' in select query");
-    println!("block: {}", block);
+    let block =
+        find_predecessor_index(rank_table, i).expect("invalid argument 'i' in select query");
     // The initial count is given by the rank at the start of the block
     let mut count = rank_table[block as usize];
+    if count == i {
+        return Some(block as u32 * BLOCK_SIZE as u32);
+    }
+    // Traverse the block
     for bit_offset in 0..min(BLOCK_SIZE, bit_vector.len() * 8) as u32 {
-        let pos = 8 * (block * BLOCK_SIZE) as u32 + bit_offset;
-        println!("pos: {}, offset: {}, len: {}, b: {}", pos, bit_offset, bit_vector.len() * 8, b);
+        let pos = (block * BLOCK_SIZE) as u32 + bit_offset;
         if access(bit_vector, pos) == b {
             count += 1;
-            println!("count: {}", count);
             if count == i {
-                println!("found! {}", pos);
                 return Some(pos);
             }
         }
@@ -126,12 +125,12 @@ fn select(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> Option
     None
 }
 
-// Returns the index of the largest value <= x, or None if not found.
+// Returns the index of the largest value < x, or None if not found.
 // Requires O(n) time for simplicity, which could be improved.
 fn find_predecessor_index(values: &Vec<u32>, x: u32) -> Option<usize> {
     let mut predecessor = None;
     for (i, &value) in values.iter().enumerate() {
-        if value <= x {
+        if value < x {
             predecessor = Some(i)
         } else {
             break;
@@ -149,20 +148,23 @@ fn build_rank_tables(bit_vector: &Vec<u8>) -> (Vec<u32>, Vec<u32>) {
     let mut rank0 = 0;
     let mut rank1 = 0;
 
-    for block in 1..rank0_table.len() {
-        for i in 0..BLOCK_SIZE * 8 {
-            let bit = access(bit_vector, (block * BLOCK_SIZE * 8 + i) as u32);
+    for block in 0..rank0_table.len() - 1 {
+        for i in 0..BLOCK_SIZE {
+            let index = block * BLOCK_SIZE + i;
+            if index >= bit_vector.len() * 8 {
+                break;
+            }
+            let bit = access(bit_vector, index as u32);
             if bit == 0 {
                 rank0 += 1;
             } else {
                 rank1 += 1;
             }
         }
-        rank0_table[block] = rank0;
-        rank1_table[block] = rank1;
+        // +1 because the rank table stores the rank at the beginning of the block
+        rank0_table[block + 1] = rank0;
+        rank1_table[block + 1] = rank1;
     }
-    println!("rank0 table: {:?}", rank0_table);
-    println!("rank1 table: {:?}", rank1_table);
     (rank0_table, rank1_table)
 }
 
@@ -207,4 +209,47 @@ fn export_results(results: Vec<u32>, output_file_path: &str) {
         .collect::<Vec<_>>()
         .join("\n");
     fs::write(output_file_path, results_string).expect("Unable to write results to output file");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+     #[test]
+     fn test_select_single_block() {
+         let bit_vector = vec![0b10101010];
+         let rank_table = vec![0];
+         assert_eq!(select(&bit_vector, &rank_table, 1, 1), Some(0));
+         assert_eq!(select(&bit_vector, &rank_table, 1, 2), Some(2));
+         assert_eq!(select(&bit_vector, &rank_table, 1, 3), Some(4));
+         assert_eq!(select(&bit_vector, &rank_table, 1, 4), Some(6));
+         assert_eq!(select(&bit_vector, &rank_table, 0, 1), Some(1));
+         assert_eq!(select(&bit_vector, &rank_table, 0, 2), Some(3));
+     }
+
+     #[test]
+     fn test_select_multiple_blocks() {
+         let bit_vector = string_to_bit_vector("1010101011001100");
+         let rank_table = vec![0, 4]; // 4 ones before the second block at index 9
+         assert_eq!(select(&bit_vector, &rank_table, 1, 5), Some(8));
+         assert_eq!(select(&bit_vector, &rank_table, 1, 6), Some(9));
+         assert_eq!(select(&bit_vector, &rank_table, 1, 7), Some(12));
+         assert_eq!(select(&bit_vector, &rank_table, 1, 8), Some(13));
+     }
+
+      #[test]
+      fn test_select_exceeds_occurrences() {
+          let bit_vector = string_to_bit_vector("10101010");
+          let rank_table = vec![0];
+          assert_eq!(select(&bit_vector, &rank_table, 1, 5), None);
+      }
+
+     #[test]
+     fn test_select_edge_cases() {
+         let bit_vector = string_to_bit_vector("1111111100000000");
+         let rank_table = vec![0, 8]; // 8 ones in first block
+         assert_eq!(select(&bit_vector, &rank_table, 1, 1), Some(0));
+         assert_eq!(select(&bit_vector, &rank_table, 1, 8), Some(7));
+         assert_eq!(select(&bit_vector, &rank_table, 1, 9), None);
+     }
 }
