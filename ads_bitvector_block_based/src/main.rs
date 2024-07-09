@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::cmp::max;
 use std::fs;
 use std::mem::size_of;
 use std::time::Instant;
@@ -77,10 +77,10 @@ fn parse_and_run_query(
 // Returns the i-th bit in the bit vector.
 fn access(bit_vector: &Vec<u8>, i: u32) -> u32 {
     // Determine the byte in which the i-th bit is located
-    let block = bit_vector[(i / 8) as usize];
+    let byte = bit_vector[(i / 8) as usize];
     // Determine the bit's offset within the byte
     let offset = 7 - (i % 8);
-    let bit = (block >> offset) & 1;
+    let bit = (byte >> offset) & 1;
     bit as u32
 }
 
@@ -103,17 +103,16 @@ fn rank(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> u32 {
 // Uses the precomputed rank tables for faster access.
 // Returns None if there is no such bit.
 fn select(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> Option<u32> {
-    // The block to search in; if the rank at a block boundary is higher than i, then we know it we went too far
-    let block =
-        find_predecessor_index(rank_table, i).expect("invalid argument 'i' in select query");
-    // The initial count is given by the rank at the start of the block
-    let mut count = rank_table[block as usize];
+    // The block to search backwards from
+    let block = find_successor_index(rank_table, i);
+    let prev_block = max(0, block - 1);
+    let mut count = rank_table[prev_block as usize];
     if count == i {
-        return Some(block as u32 * BLOCK_SIZE as u32);
+        return Some(prev_block as u32 * BLOCK_SIZE as u32);
     }
-    // Traverse the block
-    for bit_offset in 0..min(BLOCK_SIZE, bit_vector.len() * 8) as u32 {
-        let pos = (block * BLOCK_SIZE) as u32 + bit_offset;
+    // Traverse the block before (at most to the end of the bitvector)
+    let pos = (prev_block * BLOCK_SIZE) as u32;
+    for pos in pos..(bit_vector.len() * 8) as u32 {
         if access(bit_vector, pos) == b {
             count += 1;
             if count == i {
@@ -125,21 +124,18 @@ fn select(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> Option
     None
 }
 
-// Returns the index of the largest value < x, or None if not found.
+// Returns the index of the smallest value >= x, or the size of the vector if not found.
 // Requires O(n) time for simplicity, which could be improved.
-fn find_predecessor_index(values: &Vec<u32>, x: u32) -> Option<usize> {
-    let mut predecessor = None;
+fn find_successor_index(values: &Vec<u32>, x: u32) -> usize {
     for (i, &value) in values.iter().enumerate() {
-        if value < x {
-            predecessor = Some(i)
-        } else {
-            break;
+        if value >= x {
+            return i;
         }
     }
-    predecessor
+    values.len()
 }
 
-// Constructs auxiliary rank tables to speed-up queries.
+// Constructs auxiliary rank tables to speed up queries.
 fn build_rank_tables(bit_vector: &Vec<u8>) -> (Vec<u32>, Vec<u32>) {
     // Stores all rank_0 / rank_1 values at the beginning of a block
     let mut rank0_table = vec![0; (bit_vector.len() * 8 + BLOCK_SIZE - 1) / BLOCK_SIZE];
@@ -215,6 +211,7 @@ fn export_results(results: Vec<u32>, output_file_path: &str) {
 mod tests {
     use super::*;
 
+    // Change BLOCK_SIZE to 8 before running the tests!
     #[test]
     fn test_select_single_block() {
         let bit_vector = vec![0b10101010];
