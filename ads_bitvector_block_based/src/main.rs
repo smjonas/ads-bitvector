@@ -87,9 +87,9 @@ fn access(bit_vector: &Vec<u8>, i: u32) -> u32 {
 // Counts the number of occurrences of bit b (0 or 1) up to the i-th position.
 // Uses a precomputed rank table for faster access.
 fn rank(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> u32 {
-    let block_index = (i as usize) / BLOCK_SIZE;
-    let mut rank = rank_table[block_index];
-    let start = (block_index * BLOCK_SIZE * 8) as u32;
+    let block = (i as usize) / BLOCK_SIZE;
+    let mut rank = rank_table[block];
+    let start = (block * BLOCK_SIZE) as u32;
 
     for j in start..i {
         if access(bit_vector, j) == b {
