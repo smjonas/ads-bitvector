@@ -8,6 +8,7 @@ colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]  # Blue, Orange, Green, Re
 
 def plot_results(results_csv, output_path):
     df = pd.read_csv(results_csv)
+    df = df.sort_values(by="k")
     plt.figure(figsize=(10, 6))
     query_types = df["query_type"].unique()
 
