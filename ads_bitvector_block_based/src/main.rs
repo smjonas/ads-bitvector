@@ -103,15 +103,15 @@ fn rank(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> u32 {
 // Uses the precomputed rank tables for faster access.
 // Returns None if there is no such bit.
 fn select(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> Option<u32> {
-    // The block to search backwards from
-    let block = find_successor_index(rank_table, i);
-    let prev_block = max(0, block - 1);
-    let mut count = rank_table[prev_block as usize];
+    // The block to search in
+    let block = find_predecessor_index(rank_table, i);
+    // The initial count is given by the rank at the start of the block
+    let mut count = rank_table[block as usize];
     if count == i {
-        return Some(prev_block as u32 * BLOCK_SIZE as u32);
+        return Some(block as u32 * BLOCK_SIZE as u32);
     }
-    // Traverse the block before (at most to the end of the bitvector)
-    let pos = (prev_block * BLOCK_SIZE) as u32;
+    // Traverse the block (at most to the end of the bitvector)
+    let pos = (block * BLOCK_SIZE) as u32;
     for pos in pos..(bit_vector.len() * 8) as u32 {
         if access(bit_vector, pos) == b {
             count += 1;
@@ -124,15 +124,18 @@ fn select(bit_vector: &Vec<u8>, rank_table: &Vec<u32>, b: u32, i: u32) -> Option
     None
 }
 
-// Returns the index of the smallest value >= x, or the size of the vector if not found.
+// Returns the index of the largest value < x, or 0 if not found.
 // Requires O(n) time for simplicity, which could be improved.
-fn find_successor_index(values: &Vec<u32>, x: u32) -> usize {
+fn find_predecessor_index(values: &Vec<u32>, x: u32) -> usize {
+    let mut predecessor = 0;
     for (i, &value) in values.iter().enumerate() {
-        if value >= x {
-            return i;
+        if value < x {
+            predecessor = i
+        } else {
+            break;
         }
     }
-    values.len()
+    predecessor
 }
 
 // Constructs auxiliary rank tables to speed up queries.
