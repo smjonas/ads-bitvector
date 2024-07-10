@@ -38,10 +38,10 @@ fn main() {
         .collect();
     let elapsed = now.elapsed();
     export_results(results, output_file_path);
-    // Calculate space used by the bit vector (round up to next byte size)
-    let bv_size = ((bit_vector.len() + 7) / 8) * size_of::<u32>();
+    // Calculate space used by the bit vector
+    let bv_size = bit_vector.len() * size_of::<u32>();
     // Sum size of all rank tables
-    let aux_tables_size = (rank0_table.len() + rank1_table.len()) * size_of::<usize>();
+    let aux_tables_size = (rank0_table.len() + rank1_table.len()) * size_of::<u32>();
     let total_size = bv_size + aux_tables_size;
     println!(
         "RESULT algo=bv name=jonas_strittmatter time={:?} space={}",

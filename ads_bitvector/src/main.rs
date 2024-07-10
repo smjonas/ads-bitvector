@@ -31,8 +31,8 @@ fn main() {
         .collect();
     let elapsed = now.elapsed();
     export_results(results, output_file_path);
-    // Calculate space used by the bit vector (round up to next byte size)
-    let size = ((bit_vector.len() + 7) / 8) * size_of::<u32>();
+    // Calculate space used by the bit vector
+    let size = bit_vector.len() * size_of::<u32>();
     println!(
         "RESULT algo=bv name=jonas_strittmatter time={:?} space={}",
         elapsed.as_millis(),
